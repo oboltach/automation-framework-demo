@@ -1,0 +1,15 @@
+{
+  "name": "automation-framework-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cy:open": "cypress open --env-file cypress.env.json",
+    "cy:open:staging": "cypress open --env-file cypress.env.staging.json",
+    "cy:open:prod": "cypress open --env-file cypress.env.prod.json",
+    "cy:open:api": "cypress open --env-file cypress.env.json --config \"specPattern=cypress/e2e/api/**/*.cy.js\""
+  },
+  "devDependencies": {
+    "cypress": "^13.8.0",
+    "cypress-mochawesome-reporter": "^3.8.2"
+  }
+}

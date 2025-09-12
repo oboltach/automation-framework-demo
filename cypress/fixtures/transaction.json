@@ -1,0 +1,19 @@
+{
+  "valid": {
+    "transfer":   { "userId": "123", "amount": 100.5, "type": "transfer",  "recipientId": "456" },
+    "deposit":    { "userId": "123", "amount": 50,    "type": "deposit" },
+    "withdrawal": { "userId": "123", "amount": 20,    "type": "withdrawal" }
+  },
+  "lists": {
+    "forUser123": [
+      { "id": "tx-1", "userId": "123", "amount": 100.5, "type": "transfer",  "recipientId": "456", "status": "SETTLED" },
+      { "id": "tx-2", "userId": "123", "amount": 50,    "type": "deposit",   "status": "SETTLED" },
+      { "id": "tx-3", "userId": "123", "amount": -10,   "type": "transfer",  "recipientId": "999", "status": "FAILED" }
+    ]
+  },
+  "invalid": {
+    "missingAmount": { "userId": "123", "type": "transfer", "recipientId": "456" },
+    "badType":       { "userId": "123", "amount": 100.5, "type": "wire", "recipientId": "456" },
+    "negativeAmount":{ "userId": "123", "amount": -1, "type": "deposit" }
+  }
+}
