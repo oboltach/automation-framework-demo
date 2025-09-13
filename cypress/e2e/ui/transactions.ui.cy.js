@@ -17,7 +17,7 @@ describe('transactions suite (UI only)', function () {
     txPage.typeRecipient(t.recipientId);
     txPage.submit();
 
-    // Pure UI checks 
+    // Pure UI checks (no API stubs)
     txPage.checkSuccessToast(); // e.g., 'Transaction created'
     txPage.assertTransactionInList({
       amount: t.amount,

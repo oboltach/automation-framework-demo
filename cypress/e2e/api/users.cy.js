@@ -1,20 +1,18 @@
 // cypress/e2e/api/users.cy.js
 import { makeUser } from '../../utils/dataFactory.js';
 import { expectUserShape, expectHttpStatus } from '../../support/assertions.js';
-
-const { makeUser } = require('../../utils/dataFactory');
-const { expectUserShape, expectHttpStatus } = require('../../support/assertions');
+import { apiFetch } from '../../support/apiFetch.js';
 
 describe('Users API', () => {
   // CRUD (Create, Read, Update, Delete) suite
   describe('CRUD', () => {
     it('Create → 201 with valid payload', () => {
-      cy.stubCreateUser({ id: 'u-1' }, 201); // RESPONSE stub
-      const payload = makeUser({ accountType: 'basic' }); // REQUEST factory
+      cy.stubCreateUser({ id: 'u-1' }, 201);
+      const payload = makeUser({ accountType: 'basic' });
 
-      cy.request('POST', '/api/users', payload).then((res) => {
-        expectHttpStatus(res, 201);
-        expectUserShape(res.body);
+      apiFetch('POST', '/api/users', payload).then(({ status, body }) => {
+        expect(status).to.eq(201);
+        expectUserShape(body);
       });
 
       cy.wait('@createUser').its('request.body').should('deep.include', payload);
@@ -24,12 +22,11 @@ describe('Users API', () => {
       const id = 'u-1';
       cy.stubGetUser(id, { name: 'John Doe', email: 'john@example.com', accountType: 'premium' }, 200);
 
-      cy.request('GET', `/api/users/${id}`).then((res) => {
+      apiFetch('GET', `/api/users/${id}`).then((res) => {
         expectHttpStatus(res, 200);
         expectUserShape(res.body);
         expect(res.body.id).to.eq(id);
       });
-
       cy.wait(`@getUser-${id}`);
     });
 
@@ -43,22 +40,22 @@ describe('Users API', () => {
         body: { id, name: update.name, email: 'john@example.com', accountType: 'premium' }
       }).as('updateUser');
 
-      cy.request('PATCH', `/api/users/${id}`, update).then((res) => {
+      apiFetch('PATCH', `/api/users/${id}`, update).then((res) => {
         expectHttpStatus(res, 200);
         expectUserShape(res.body);
         expect(res.body.name).to.eq('John Updated');
       });
-
       cy.wait('@updateUser').its('request.body').should('deep.include', update);
     });
 
     it('Delete → 204 (stubbed endpoint)', () => {
       const id = 'u-1';
-      cy.intercept('DELETE', `/api/users/${id}`, { statusCode: 204, body: {} }).as('deleteUser');
+      cy.intercept('DELETE', `**/api/users/${id}`, { statusCode: 204 }).as('deleteUser');
 
-      cy.request('DELETE', `/api/users/${id}`).then((res) => {
-        expect(res.status).to.eq(204);
-      });
+      apiFetch('DELETE', `/api/users/${id}`, null, { expectJson: false })
+        .then(({ status }) => {
+          expect(status).to.eq(204);
+        });
 
       cy.wait('@deleteUser');
     });
@@ -72,30 +69,35 @@ describe('Users API', () => {
       cy.stubError('POST', '/api/users', 400, { error: 'Invalid email' });
       const bad = makeUser({ email: 'not-an-email' });
 
-      cy.request({ method: 'POST', url: '/api/users', body: bad, failOnStatusCode: false })
-        .its('status').should('eq', 400);
+      apiFetch('POST', '/api/users', bad).then(({ status, body }) => {
+        expect(status).to.eq(400);
+        expect(body).to.have.property('error', 'Invalid email');
+      });
     });
 
     it('404 on missing user', () => {
-      cy.stubError('GET', '/api/users/not-found', 404, { error: 'User not found' });
+      cy.stubError('GET', '**/api/users/not-found', 404, { error: 'User not found' });
 
-      cy.request({ method: 'GET', url: '/api/users/not-found', failOnStatusCode: false })
-        .its('status').should('eq', 404);
+      apiFetch('GET', '/api/users/not-found', null, { expectJson: false }).then(({ status }) => {
+          expect(status).to.eq(404);
+        });
     });
 
     it('409 on duplicate email', () => {
       cy.stubError('POST', '/api/users', 409, { error: 'Duplicate email' });
       const dup = makeUser({ email: 'dup@example.com' });
 
-      cy.request({ method: 'POST', url: '/api/users', body: dup, failOnStatusCode: false })
-        .its('status').should('eq', 409);
+      apiFetch('POST', '/api/users', dup, { expectJson: false }).then(({ status }) => {
+        expect(status).to.eq(409);
+      });
     });
 
     it('500 on server error (read)', () => {
       cy.stubError('GET', '/api/users/u-err', 500, { error: 'Internal error' });
 
-      cy.request({ method: 'GET', url: '/api/users/u-err', failOnStatusCode: false })
-        .its('status').should('eq', 500);
+      apiFetch('GET', '/api/users/u-err', null, { expectJson: false }).then(({ status }) => {
+        expect(status).to.eq(500);
+      });
     });
   });
 
@@ -108,12 +110,12 @@ describe('Users API', () => {
       // Build a response that mirrors the inbound payload
       cy.stubCreateUser({ id: 'u-echo', ...payload }, 201);
 
-      cy.request('POST', '/api/users', payload).then((res) => {
-        expectHttpStatus(res, 201);
-        expectUserShape(res.body);
-        expect(res.body.name).to.eq(payload.name);
-        expect(res.body.email).to.eq(payload.email);
-        expect(res.body.accountType).to.eq(payload.accountType);
+      apiFetch('POST', '/api/users', payload, { expectJson: true }).then(({ status, body }) => {
+        expect(status).to.eq(201);
+        expectUserShape(body);
+        expect(body.name).to.eq(payload.name);
+        expect(body.email).to.eq(payload.email);
+        expect(body.accountType).to.eq(payload.accountType);
       });
     });
   });
@@ -129,13 +131,9 @@ describe('Users API', () => {
       }).as('createUserAuth');
 
       const payload = makeUser();
-      cy.request({
-        method: 'POST',
-        url: '/api/users',
-        body: payload,
-        failOnStatusCode: false // expect 401
-      }).its('status').should('eq', 401);
-
+      apiFetch('POST', '/api/users', payload, { expectJson: false }).then(({ status }) => {
+        expect(status).to.eq(401);
+      });
       cy.wait('@createUserAuth');
     });
 
@@ -145,40 +143,40 @@ describe('Users API', () => {
         body: { error: 'Forbidden' }
       }).as('getUserAuthZ');
 
-      cy.request({
-        method: 'GET',
-        url: '/api/users/u-1',
-        headers: { 'x-role': 'viewer' },
-        failOnStatusCode: false
-      }).its('status').should('eq', 403);
-
+      apiFetch('GET', '/api/users/u-1', null, { expectJson: false }).then(({ status }) => {
+        expect(status).to.eq(403);
+      });
       cy.wait('@getUserAuthZ');
     });
 
     it('201 Created when Bearer token is present', () => {
-      cy.intercept('POST', '/api/users', {
+      cy.intercept('POST', '**/api/users', {
         statusCode: 201,
+        headers: { 'content-type': 'application/json' },
         body: {
           id: 'u-auth',
           name: 'John',
           email: 'john@example.com',
-          accountType: 'premium'
-        }
+          accountType: 'premium',
+        },
       }).as('createUserWithToken');
 
       const payload = makeUser({ accountType: 'business' });
 
-      cy.request({
-        method: 'POST',
-        url: '/api/users',
-        headers: { Authorization: 'Bearer test-token' },
-        body: payload
-      }).then((res) => {
-        expectHttpStatus(res, 201);
-        expectUserShape(res.body);
+      apiFetch('POST', '/api/users', payload, {
+        headers: { Authorization: 'Bearer test-token' }, // ← this now gets forwarded
+        expectJson: true,
+      }).then(({ status, body }) => {
+        expect(status).to.eq(201);
+        expectUserShape(body);
       });
 
-      cy.wait('@createUserWithToken');
+      cy.wait('@createUserWithToken').then(({ request }) => {
+        // headers are lowercase
+        expect(request.headers).to.have.property('authorization');
+        expect(request.headers.authorization).to.match(/^Bearer\s+/);
+        expect(request.body).to.deep.include(payload);
+      });
     });
   });
 });

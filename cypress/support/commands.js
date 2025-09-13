@@ -10,7 +10,7 @@ Cypress.Commands.add('stubCreateUser', (resp = {}, statusCode = 201) => {
     email: resp.email ?? 'john@example.com',
     accountType: resp.accountType ?? 'premium',
   };
-  cy.intercept('POST', '/api/users', { statusCode, body }).as('createUser');
+  cy.intercept('POST', '**/api/users', { statusCode, body }).as('createUser');
 });
 
 // GET /api/users/:id
@@ -21,7 +21,7 @@ Cypress.Commands.add('stubGetUser', (id, resp = {}, statusCode = 200) => {
     email: resp.email ?? 'john@example.com',
     accountType: resp.accountType ?? 'premium',
   };
-  cy.intercept('GET', `/api/users/${id}`, { statusCode, body }).as(`getUser-${id}`);
+  cy.intercept('GET', `**/api/users/${id}`, { statusCode, body }).as(`getUser-${id}`);
 });
 
 // POST /api/transactions
@@ -34,7 +34,7 @@ Cypress.Commands.add('stubCreateTransaction', (resp = {}, statusCode = 201) => {
     recipientId: resp.recipientId ?? '456',
     status: resp.status ?? 'PENDING',
   };
-  cy.intercept('POST', '/api/transactions', { statusCode, body }).as('createTransaction');
+  cy.intercept('POST', '**/api/transactions', { statusCode, body }).as('createTransaction');
 });
 
 // GET /api/transactions/:userId (single default transaction)
@@ -47,7 +47,7 @@ Cypress.Commands.add('stubGetTransactions', (userId, statusCode = 200) => {
     recipientId: '456',
     status: 'SETTLED',
   }];
-  cy.intercept('GET', `/api/transactions/${userId}`, { statusCode, body }).as(`getTransactions-${userId}`);
+  cy.intercept('GET', `**/api/transactions/${userId}`, { statusCode, body }).as(`getTransactions-${userId}`);
 });
 
 // Generic error stub (string URLs; allows JSON-like body; normalizes method)

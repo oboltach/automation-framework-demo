@@ -3,8 +3,8 @@ import { makeTransaction } from '../../utils/dataFactory.js';
 import {
   expectTransactionShape,
   expectArrayOfTransactions,
-  expectHttpStatus,
 } from '../../support/assertions.js';
+import { apiFetch } from '../../support/apiFetch.js';
 
 describe('Transactions API', () => {
   // ───────────────────────────────────────────────────────────
@@ -12,26 +12,28 @@ describe('Transactions API', () => {
   // ───────────────────────────────────────────────────────────
   describe('CRUD', () => {
     it('Create → 201 with valid payload', () => {
-      cy.stubCreateTransaction({ id: 'tx-1', status: 'SETTLED' }, 201); // RESPONSE stub
-      const payload = makeTransaction({ userId: 'u-1', amount: 250.75, type: 'transfer' }); // REQUEST factory
+      cy.stubCreateTransaction({ id: 'tx-1', status: 'SETTLED' }, 201); // stubs **/api/transactions
+      const payload = makeTransaction({ userId: 'u-1', amount: 250.75, type: 'transfer' });
 
-      cy.request('POST', '/api/transactions', payload).then((res) => {
-        expectHttpStatus(res, 201);
-        expectTransactionShape(res.body);
-        expect(res.body.status).to.eq('SETTLED');
-      });
+      apiFetch('POST', '/api/transactions', payload, { expectJson: true })
+        .then(({ status, body }) => {
+          expect(status).to.eq(201);
+          expectTransactionShape(body);
+          expect(body.status).to.eq('SETTLED');
+        });
 
       cy.wait('@createTransaction').its('request.body').should('deep.include', payload);
     });
 
     it('Read → 200 list for a user', () => {
       const userId = 'u-1';
-      cy.stubGetTransactions(userId, 200); // default stub returns one tx
+      cy.stubGetTransactions(userId, 200); // stubs **/api/transactions/:userId
 
-      cy.request('GET', `/api/transactions/${userId}`).then((res) => {
-        expectHttpStatus(res, 200);
-        expectArrayOfTransactions(res.body, 1);
-      });
+      apiFetch('GET', `/api/transactions/${userId}`, null, { expectJson: true })
+        .then(({ status, body }) => {
+          expect(status).to.eq(200);
+          expectArrayOfTransactions(body, 1);
+        });
 
       cy.wait(`@getTransactions-${userId}`);
     });
@@ -40,7 +42,7 @@ describe('Transactions API', () => {
       const txId = 'tx-1';
       const update = { amount: 300 };
 
-      cy.intercept('PATCH', `/api/transactions/${txId}`, {
+      cy.intercept('PATCH', `**/api/transactions/${txId}`, {
         statusCode: 200,
         body: {
           id: txId,
@@ -52,22 +54,24 @@ describe('Transactions API', () => {
         },
       }).as('updateTx');
 
-      cy.request('PATCH', `/api/transactions/${txId}`, update).then((res) => {
-        expectHttpStatus(res, 200);
-        expectTransactionShape(res.body);
-        expect(res.body.amount).to.eq(300);   // assert the changed field
-      });
+      apiFetch('PATCH', `/api/transactions/${txId}`, update, { expectJson: true })
+        .then(({ status, body }) => {
+          expect(status).to.eq(200);
+          expectTransactionShape(body);
+          expect(body.amount).to.eq(300);
+        });
 
       cy.wait('@updateTx').its('request.body').should('deep.include', update);
     });
 
     it('Delete transaction → 204', () => {
       const txId = 'tx-1';
-      cy.intercept('DELETE', `/api/transactions/${txId}`, { statusCode: 204, body: {} }).as('deleteTx');
+      cy.intercept('DELETE', `**/api/transactions/${txId}`, { statusCode: 204 }).as('deleteTx');
 
-      cy.request('DELETE', `/api/transactions/${txId}`).then((res) => {
-        expect(res.status).to.eq(204);
-      });
+      apiFetch('DELETE', `/api/transactions/${txId}`, null, { expectJson: false })
+        .then(({ status }) => {
+          expect(status).to.eq(204);
+        });
 
       cy.wait('@deleteTx');
     });
@@ -78,55 +82,67 @@ describe('Transactions API', () => {
   // ───────────────────────────────────────────────────────────
   describe('Errors', () => {
     it('400 on invalid amount (negative)', () => {
-      cy.stubError('POST', '/api/transactions', 400, { error: 'Invalid amount' });
+      cy.intercept('POST', '**/api/transactions', {
+        statusCode: 400,
+        headers: { 'content-type': 'application/json' },
+        body: { error: 'Invalid amount' },
+      }).as('createTx400');
+
       const bad = makeTransaction({ amount: -1 });
 
-      cy.request({
-        method: 'POST',
-        url: '/api/transactions',
-        body: bad,
-        failOnStatusCode: false,
-      })
-        .its('status')
-        .should('eq', 400);
+      apiFetch('POST', '/api/transactions', bad, { expectJson: false })
+        .then(({ status }) => {
+          expect(status).to.eq(400);
+        });
+
+      cy.wait('@createTx400').its('request.body').should('deep.include', bad);
     });
 
     it('400 on invalid type', () => {
-      cy.stubError('POST', '/api/transactions', 400, { error: 'Invalid type' });
+      cy.intercept('POST', '**/api/transactions', {
+        statusCode: 400,
+        headers: { 'content-type': 'application/json' },
+        body: { error: 'Invalid type' },
+      }).as('createTxType400');
+
       const bad = makeTransaction({ type: 'wire' }); // not in allowed set
 
-      cy.request({
-        method: 'POST',
-        url: '/api/transactions',
-        body: bad,
-        failOnStatusCode: false,
-      })
-        .its('status')
-        .should('eq', 400);
+      apiFetch('POST', '/api/transactions', bad, { expectJson: false })
+        .then(({ status }) => {
+          expect(status).to.eq(400);
+        });
+
+      cy.wait('@createTxType400').its('request.body').should('deep.include', bad);
     });
 
     it('404 on transactions for unknown user', () => {
-      cy.stubError('GET', '/api/transactions/unknown-user', 404, { error: 'User not found' });
+      cy.intercept('GET', '**/api/transactions/unknown-user', {
+        statusCode: 404,
+        headers: { 'content-type': 'application/json' },
+        body: { error: 'User not found' },
+      }).as('listUnknown404');
 
-      cy.request({
-        method: 'GET',
-        url: '/api/transactions/unknown-user',
-        failOnStatusCode: false,
-      })
-        .its('status')
-        .should('eq', 404);
+      apiFetch('GET', '/api/transactions/unknown-user', null, { expectJson: false })
+        .then(({ status }) => {
+          expect(status).to.eq(404);
+        });
+
+      cy.wait('@listUnknown404');
     });
 
     it('500 on server error (read)', () => {
-      cy.stubError('GET', '/api/transactions/u-err', 500, { error: 'Internal error' });
+      cy.intercept('GET', '**/api/transactions/u-err', {
+        statusCode: 500,
+        headers: { 'content-type': 'application/json' },
+        body: { error: 'Internal error' },
+      }).as('listErr500');
 
-      cy.request({
-        method: 'GET',
-        url: '/api/transactions/u-err',
-        failOnStatusCode: false,
-      })
-        .its('status')
-        .should('eq', 500);
+      apiFetch('GET', '/api/transactions/u-err', null, { expectJson: false })
+        .then(({ status }) => {
+          expect(status).to.eq(500);
+        });
+
+      cy.wait('@listErr500');
     });
   });
 
@@ -144,13 +160,16 @@ describe('Transactions API', () => {
       // Response mirrors payload and adds id/status
       cy.stubCreateTransaction({ id: 'tx-echo', ...payload, status: 'PENDING' }, 201);
 
-      cy.request('POST', '/api/transactions', payload).then((res) => {
-        expectHttpStatus(res, 201);
-        expectTransactionShape(res.body);
-        expect(res.body.userId).to.eq(payload.userId);
-        expect(res.body.amount).to.eq(payload.amount);
-        expect(res.body.type).to.eq(payload.type);
-      });
+      apiFetch('POST', '/api/transactions', payload, { expectJson: true })
+        .then(({ status, body }) => {
+          expect(status).to.eq(201);
+          expectTransactionShape(body);
+          expect(body.userId).to.eq(payload.userId);
+          expect(body.amount).to.eq(payload.amount);
+          expect(body.type).to.eq(payload.type);
+        });
+
+      cy.wait('@createTransaction').its('request.body').should('deep.include', payload);
     });
   });
 
@@ -159,45 +178,41 @@ describe('Transactions API', () => {
   // ───────────────────────────────────────────────────────────
   describe('Auth', () => {
     it('401 Unauthorized when creating a transaction', () => {
-      cy.intercept('POST', '/api/transactions', {
+      cy.intercept('POST', '**/api/transactions', {
         statusCode: 401,
+        headers: { 'content-type': 'application/json' },
         body: { error: 'Unauthorized' },
       }).as('createTx401');
 
       const payload = makeTransaction();
 
-      cy.request({
-        method: 'POST',
-        url: '/api/transactions',
-        body: payload,
-        failOnStatusCode: false,
-      })
-        .its('status')
-        .should('eq', 401);
+      apiFetch('POST', '/api/transactions', payload, { expectJson: false })
+        .then(({ status }) => {
+          expect(status).to.eq(401);
+        });
 
       cy.wait('@createTx401');
     });
 
     it('403 Forbidden when reading transactions list', () => {
-      cy.intercept('GET', '/api/transactions/*', {
+      cy.intercept('GET', '**/api/transactions/*', {
         statusCode: 403,
+        headers: { 'content-type': 'application/json' },
         body: { error: 'Forbidden' },
       }).as('listTx403');
 
-      cy.request({
-        method: 'GET',
-        url: '/api/transactions/u-1',
-        failOnStatusCode: false,
-      })
-        .its('status')
-        .should('eq', 403);
+      apiFetch('GET', '/api/transactions/u-1', null, { expectJson: false })
+        .then(({ status }) => {
+          expect(status).to.eq(403);
+        });
 
       cy.wait('@listTx403');
     });
 
     it('201 Created (create)', () => {
-      cy.intercept('POST', '/api/transactions', {
+      cy.intercept('POST', '**/api/transactions', {
         statusCode: 201,
+        headers: { 'content-type': 'application/json' },
         body: {
           id: 'tx-auth-ok',
           userId: 'u-1',
@@ -209,14 +224,12 @@ describe('Transactions API', () => {
 
       const payload = makeTransaction({ userId: 'u-1', amount: 42, type: 'transfer' });
 
-      cy.request({
-        method: 'POST',
-        url: '/api/transactions',
-        headers: { Authorization: 'Bearer test-token' }, // optional now
-        body: payload,
-      }).then((res) => {
-        expectHttpStatus(res, 201);
-        expectTransactionShape(res.body);
+      apiFetch('POST', '/api/transactions', payload, {
+        headers: { authorization: 'Bearer test-token' }, // lowercase for consistency
+        expectJson: true,
+      }).then(({ status, body }) => {
+        expect(status).to.eq(201);
+        expectTransactionShape(body);
       });
 
       cy.wait('@createTx201').its('request.body').should('deep.include', payload);

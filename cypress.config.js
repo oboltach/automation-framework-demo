@@ -1,18 +1,12 @@
 import { defineConfig } from 'cypress';
-import mochawesome from 'cypress-mochawesome-reporter/plugin';
+import mochawesome from 'cypress-mochawesome-reporter/plugin.js'; 
 
 export default defineConfig({
   e2e: {
-    baseUrl: 'http://localhost:4000', // fallback
-    specPattern: 'cypress/e2e/**/*.cy.js',
-    defaultCommandTimeout: 8000,
-    supportFile: 'cypress/support/e2e.js',  // load commands/reporter before every spec
-    retries: 0,
+    // ...your existing config...
     setupNodeEvents(on, config) {
       mochawesome(on);
-      if (config.env?.BASE_URL) {
-        config.baseUrl = config.env.BASE_URL;
-      }
+      if (config.env?.BASE_URL) config.baseUrl = config.env.BASE_URL;
       return config;
     },
   },

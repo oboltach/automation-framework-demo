@@ -3,13 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "cy:open": "cypress open --env-file cypress.env.json",
-    "cy:open:staging": "cypress open --env-file cypress.env.staging.json",
-    "cy:open:prod": "cypress open --env-file cypress.env.prod.json",
-    "cy:open:api": "cypress open --env-file cypress.env.json --config \"specPattern=cypress/e2e/api/**/*.cy.js\""
+    "cy:run": "cypress run",
+    "cy:run:api": "cypress run --spec \"cypress/e2e/api/**/*.cy.js\" --config baseUrl=https://example.com --env BASE_URL=",
+    "cy:open:api": "cypress open --config \"specPattern=cypress/e2e/api/**/*.cy.js,baseUrl=https://example.com\" --env BASE_URL="
   },
   "devDependencies": {
     "cypress": "^13.8.0",
-    "cypress-mochawesome-reporter": "^3.8.2"
+    "cypress-mochawesome-reporter": "^3.8.2",
+    "http-server": "^14.1.1",
+    "start-server-and-test": "^2.1.0"
   }
 }

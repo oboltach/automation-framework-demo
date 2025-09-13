@@ -15,7 +15,8 @@
   /support
     commands.js                   # API helpers (cy.createUser, cy.createTransaction, etc.)
     assertions.js                 # Custom assertions
-    e2e.js
+    e2e.js                        # The global Cypress support file that runs before every spec to load custom commands.
+    apiFetch.js                   # helper that sends browser fetch requests (so cy.intercept can stub them) and returns parsed status/body for assertions.
   /fixtures
     users.json
     transactions.json
@@ -27,8 +28,8 @@
 /cypress.env.staging.json         # env file for staging
 
 
-How to Run Tests (no UI)
 
+How to Run
 1) Clone & install
 git clone https://github.com/<your-username>/<repo-name>.git
 cd <repo-name>
@@ -36,38 +37,30 @@ npm install
 
 2) Open Cypress (API specs only)
 
-Use the API-only script so the runner only loads cypress/e2e/api/**:
+Loads only cypress/e2e/api/** and uses a safe baseUrl so no server is required.
 
 npm run cy:open:api
 
-Notes
-
-No server required. API specs use cy.intercept() to stub /api/* calls, so tests run without a backend.
-
-Base URL: We still set a baseUrl in cypress.config.*, but with stubs it won’t hit the network.
-
-If you later add UI specs, run npm run cy:open to see both API and UI suites.
+This runs Cypress in interactive mode. All network calls are intercepted
 
 
+3) Headless run (API specs only) + reports
 
-How to Run Tests
+Generates Mochawesome HTML/JSON reports and videos.
 
-Clone the repo
+npm run cy:run:api
 
-git clone https://github.com/<your-username>/<repo-name>.git
-cd <repo-name>
+Reports: cypress/reports/ (HTML + JSON per spec)
 
+Screenshots (on failure): cypress/reports/screenshots/
 
-Install dependencies
-
-npm install
-
-
-Open Cypress Test Runner (interactive mode)
-
-npx cypress open
+Videos (run mode only): cypress/reports/videos/
 
 
-Run tests in headless mode (CI/CD friendly)
+Project Notes
 
-npx cypress run
+Pure intercepts: All requests use browser fetch via a helper (cypress/support/apiFetch.js), so cy.intercept() reliably stubs responses.
+
+Intercepts use patterns like **/api/users to work with any baseUrl.
+
+UI tests exist under cypress/e2e/ui/, but they are not executed by the default commands because there is no HTML app/page being served. Cypress UI tests require a page to cy.visit().
