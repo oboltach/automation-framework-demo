@@ -6,7 +6,7 @@ export default defineConfig({
     baseUrl: "http://localhost:4000", // fallback
     specPattern: "cypress/e2e/**/*.cy.js",
     defaultCommandTimeout: 8000,
-    retries: 0
+    retries: 0,
     setupNodeEvents(on, config) {
       mochawesome(on);
       if (config.env?.BASE_URL) config.baseUrl = config.env.BASE_URL;
@@ -19,6 +19,7 @@ export default defineConfig({
     overwrite: false,
     html: true,
     json: true,
+    saveJson: true,
   },
   screenshotsFolder: 'cypress/reports/screenshots',
   videosFolder: 'cypress/reports/videos',
